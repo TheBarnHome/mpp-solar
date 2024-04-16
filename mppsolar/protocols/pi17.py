@@ -2,13 +2,9 @@ import logging
 
 from .abstractprotocol import AbstractProtocol
 
-# from .protocol_helpers import crcPI as crc
-
-# from .pi30 import COMMANDS
-
 log = logging.getLogger("pi17")
 
-COMMANDS = {
+QUERY_COMMANDS = {
     "PI": {
         "name": "PI",
         "prefix": "^P003",
@@ -65,6 +61,12 @@ COMMANDS = {
                 "Machine number",
                 {
                     "000": "Infini-Solar 10KW/3P",
+                    "001": "Infini-Solar 15KW/3P",
+                    "002": "Infini-Solar 15KW/3P-custom",
+                    "003": "Infini-Solar WP (Infini WP 12K/15K)",
+                    "004": "Infini-Solar WP 30KW/3P",
+                    "005": "Infini-Solar WP LV 6KW/2P",
+                    "006": "Infini-Solar WP TWIN",
                 },
             ],
             ["int", "Output rated VA", "kW"],
@@ -111,9 +113,9 @@ COMMANDS = {
             ["int", "Battery weak back voltage in hybrid mode", "0.1V"],
             ["int", "Battery stop charge current level in floating charging", "0.1A"],
             ["int", "Keep charged time of battery catch stop charger current level", "0.1A"],
-            ["int", "Battery voltage of recover to charge when battery stop charger in floating charging", "0.1V"]
+            ["int", "Battery voltage of recover to charge when battery stop charger in floating charging", "0.1V"],
         ],
-        "test_responses": []
+        "test_responses": [],
     },
     "DM": {
         "name": "DM",
@@ -121,12 +123,8 @@ COMMANDS = {
         "description": "Query machine model",
         "help": "For outputs interpretation see documentations",
         "type": "QUERY",
-        "response": [
-            ["string", "model_code", ""]
-        ],
-        "test_response": [
-            b'^D006050h\xdb\r'
-        ]
+        "response": [["string", "model_code", ""]],
+        "test_responses": [b"^D006050h\xdb\r"],
     },
     "INGS": {
         "name": "INGS",
@@ -135,30 +133,19 @@ COMMANDS = {
         "help": "",
         "type": "QUERY",
         "response": [
-            ["int", "Input current R", "0.1V"],
-            ["int", "Input current S", "0.1V"],
-            ["int", "Input current T", "0.1V"],
-            ["int", "Output current R", "0.1V"],
-            ["int", "Output current S", "0.1V"],
-            ["int", "Output current T", "0.1V"],
+            ["int", "Input current R", "0.1A"],
+            ["int", "Input current S", "0.1A"],
+            ["int", "Input current T", "0.1A"],
+            ["int", "Output current R", "0.1A"],
+            ["int", "Output current S", "0.1A"],
+            ["int", "Output current T", "0.1A"],
             ["int", "PBusVolt", "0.1V"],
             ["int", "NBusVolt", "0.1V"],
             ["int", "PBusAvgV", "0.1V"],
             ["int", "NBusAvgV", "0.1V"],
             ["int", "NLintCur", "0.1A"],
         ],
-        "test_responses": [
-            b'^D0560020,0019,0021,0002,0004,0005,3809,3809,3810,3807,000\xf1\x1e\r'
-        ]
-    },
-    "RTCP": {
-        "name": "RTCP",
-        "prefix": "^P004",
-        "description": "",
-        "help": "",
-        "type": "QUERY",
-        "response": [],
-        "test_responses": []
+        "test_responses": [b"^D0560020,0019,0021,0002,0004,0005,3809,3809,3810,3807,000\xf1\x1e\r"],
     },
     "EMINFO": {
         "name": "EMINFO",
@@ -172,22 +159,10 @@ COMMANDS = {
             ["int", "ActPvPow", ""],
             ["int", "ActFeedPow", ""],
             ["int", "ReservPow", ""],
-            ["int", "EMLast", ""]
+            ["int", "EMLast", ""],
         ],
-        "test_responses": [
-            b'^D0301,10000,00005,00010,00000,1\xad\xc4\r'
-        ]
+        "test_responses": [b"^D0301,10000,00005,00010,00000,1\xad\xc4\r"],
     },
-
-    # "AA,B,C,D,E,F,G,H,I": {   # defined in spec, but does not seems to work
-    #     "name": "AA,B,C,D,E,F,G,H,I",
-    #     "prefix": "^D019",
-    #     "description": "",
-    #     "help": "",
-    #     "type": "QUERYD",
-    #     "response": [],
-    #     "test_responses": []
-    # },
     "PIRI": {
         "name": "PIRI",
         "prefix": "^P005",
@@ -291,7 +266,6 @@ COMMANDS = {
             ["option", "Line power direction", ["Idle", "Input", "Output"]],
         ],
         "test_responses": [
-            b"",
         ],
     },
     "MOD": {
@@ -326,38 +300,28 @@ COMMANDS = {
         "help": " -- queries any active warnings flags from the Inverter",
         "type": "QUERY",
         "response": [
-            [
-                "flags",
-                "Warning status",
-                [
-                    "Solar input 1 loss",
-                    "Solar input 2 loss",
-                    "Solar input 1 voltage too high",
-                    "Solar input 2 voltage too high",
-                    "Battery under voltage",
-                    "Battery low voltage",
-                    "Battery disconnected",
-                    "Battery over voltage",
-                    "Battery low in hybrid mode",
-                    "Grid voltage high loss",
-                    "Grid voltage low loss",
-                    "Grid frequency high loss",
-                    "Grid frequency low loss",
-                    "AC input long-time average voltage over",
-                    "AC input voltage loss",
-                    "AC input frequency loss",
-                    "AC input island",
-                    "AC input phase dislocation",
-                    "Over temperature",
-                    "Over load",
-                    "Emergency Power Off active",
-                    "AC input wave loss",
-                    "Reserved",
-                    "Reserved",
-                    "Reserved",
-                    "Reserved",
-                ],
-            ],
+            ["option", "Solar input 1 loss", ["disabled", "enabled"]],
+            ["option", "Solar input 2 loss", ["disabled", "enabled"]],
+            ["option", "Solar input 1 voltage too high", ["disabled", "enabled"]],
+            ["option", "Solar input 2 voltage too high", ["disabled", "enabled"]],
+            ["option", "Battery under voltage", ["disabled", "enabled"]],
+            ["option", "Battery low voltage", ["disabled", "enabled"]],
+            ["option", "Battery disconnected", ["disabled", "enabled"]],
+            ["option", "Battery over voltage", ["disabled", "enabled"]],
+            ["option", "Battery low in hybrid mode", ["disabled", "enabled"]],
+            ["option", "Grid voltage high loss", ["disabled", "enabled"]],
+            ["option", "Grid voltage low loss", ["disabled", "enabled"]],
+            ["option", "Grid frequency high loss", ["disabled", "enabled"]],
+            ["option", "Grid frequency low loss", ["disabled", "enabled"]],
+            ["option", "AC input long-time average voltage over", ["disabled", "enabled"]],
+            ["option", "AC input voltage loss", ["disabled", "enabled"]],
+            ["option", "AC input frequency loss", ["disabled", "enabled"]],
+            ["option", "AC input island", ["disabled", "enabled"]],
+            ["option", "AC input phase dislocation", ["disabled", "enabled"]],
+            ["option", "Over temperature", ["disabled", "enabled"]],
+            ["option", "Over load", ["disabled", "enabled"]],
+            ["option", "Emergency Power Off active", ["disabled", "enabled"]],
+            ["option", "AC input wave loss", ["disabled", "enabled"]],
         ],
         "test_responses": [
             b"^D0471,1,0,0,1,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,\x14\x9c\r",
@@ -405,7 +369,12 @@ COMMANDS = {
         "help": " -- queries total generated energy from the Inverter",
         "type": "QUERY",
         "response": [
-            ["int", "Generated energy", "kWh"],
+            [
+                "int",
+                "Generated Energy Total",
+                "kWh",
+                {"icon": "mdi:counter", "device-class": "energy", "state_class": "total"},
+            ],
         ],
         "test_responses": [
             b"^D01100006591\xba\x10\r",
@@ -449,10 +418,16 @@ COMMANDS = {
             ["int", "Battery discharge max current in hybrid mode", "A"],
             ["option", "Enable/Disable EPS function", ["Disabled", "Enabled"]],
             ["int", "Battery voltage of cut-off Main output in battery mode(", "0.1V"],
-            ["int", "Battery voltage of re-connecting Main output in battery mode", "0.1V"],
+            [
+                "int",
+                "Battery voltage of re-connecting Main output in battery mode",
+                "0.1V",
+            ],
         ],
         "test_responses": [
             b"^D0762000,0584,0576,0000,000,0576,0460,0510,0460,0510,1,,,1,0540,000,2000,0250\x85Y\r",
+            b"^D0941750,0560,0540,0000,060,0530,0420,0480,0480,0540,0,,,0,0480,000,0100,0175,000,000,000,000,0\xc9\xd9\r",
+            b"^D0941750,0560,0540,0000,060,0530,0420,0480,0480,0540,0,,,0,0480,000,0100,0175,010,020,020,080,0mr\r",
         ],
     },
     "HECS": {
@@ -470,21 +445,18 @@ COMMANDS = {
                     "01": "Load-Battery-Grid",
                     "02": "Load-Grid-Battery",
                 },
-                "flags",
-                [
-                    "Solar charge battery",
-                    "AC charge battery",
-                    "Feed power to utility",
-                    "Battery discharge to loads when solar input normal",
-                    "Battery discharge to loads when solar input loss",
-                    "Battery discharge to feed grid when solar input normal",
-                    "Battery discharge to feed grid when solar input loss",
-                    "Reserved",
-                ],
             ],
+            ["option", "Solar charge battery", ["disabled", "enabled"]],
+            ["option", "AC charge battery", ["disabled", "enabled"]],
+            ["option", "Feed power to utility", ["disabled", "enabled"]],
+            ["option", "Battery discharge to loads when solar input normal", ["disabled", "enabled"]],
+            ["option", "Battery discharge to loads when solar input loss", ["disabled", "enabled"]],
+            ["option", "Battery discharge to feed grid when solar input normal", ["disabled", "enabled"]],
+            ["option", "Battery discharge to feed grid when solar input loss", ["disabled", "enabled"]],
+            ["option", "Reserved", ["disabled", "enabled"]],
         ],
         "test_responses": [
-            b"^D019\xd9\x9f,0,0,0,0,0,0,0,0\r",
+            b"^D01900,0,0,0,0,0,0,0,0\r",
         ],
     },
     "EY": {
@@ -494,7 +466,7 @@ COMMANDS = {
         "help": " -- queries generated energy for the year YYYY from the Inverter",
         "type": "QUERYEN",
         "response": [
-            ["int", "Generated energy", "Wh"],
+            ["int", "Generated Energy Year", "Wh"],
         ],
         "test_responses": [
             b"^D01100006591\xba\x10\r",
@@ -508,7 +480,7 @@ COMMANDS = {
         "help": " -- queries generated energy for the month YYYYMM from the Inverter",
         "type": "QUERYEN",
         "response": [
-            ["int", "Generated energy", "Wh"],
+            ["int", "Generated Energy Month", "Wh"],
         ],
         "test_responses": [
             b"^D01000006591\xba\x10\r",
@@ -522,7 +494,7 @@ COMMANDS = {
         "help": " -- queries generated energy for the day YYYYMMDD from the Inverter",
         "type": "QUERYEN",
         "response": [
-            ["int", "Generated energy", "Wh"],
+            ["int", "Generated Energy Day", "Wh"],
         ],
         "test_responses": [
             b"^D009000091\xba\x10\r",
@@ -536,13 +508,16 @@ COMMANDS = {
         "help": " -- queries generated energy for the hour YYYYMMDDHH from the Inverter",
         "type": "QUERYEN",
         "response": [
-            ["int", "Generated energy", "Wh"],
+            ["int", "Generated Energy Hour", "Wh"],
         ],
         "test_responses": [
             b"^D008000001\xba\x10\r",
         ],
         "regex": "EH(\\d\\d\\d\\d\\d\\d\\d\\d\\d\\d)$",
     },
+}
+
+SETTER_COMMANDS = {
     "LON": {
         "name": "LON",
         "description": "Set enable/disable machine supply power to the loads",
@@ -793,7 +768,7 @@ COMMANDS = {
             b"^1\x0b\xc2\r",
             b"^0\x1b\xe3\r",
         ],
-        "regex": "MCHGV(05\\d\\d,05\\d\\d)$",
+        "regex": "MCHGV(0[45]\\d\\d,0[45]\\d\\d)$",
     },
     "ACCT": {
         "name": "ACCT",
@@ -807,7 +782,7 @@ COMMANDS = {
             b"^1\x0b\xc2\r",
             b"^0\x1b\xe3\r",
         ],
-        "regex": "ACCT(2[0-3]|[01]?[0-9])([0-5]?[0-9])-(2[0-3]|[01]?[0-9])([0-5]?[0-9])$",
+        "regex": "ACCT((2[0-3]|[01]?[0-9])([0-5]?[0-9])-(2[0-3]|[01]?[0-9])([0-5]?[0-9]))$",
     },
     "ACCB": {
         "name": "ACCB",
@@ -823,9 +798,23 @@ COMMANDS = {
         ],
         "regex": "ACCB([01],0[456]\\d\\d)$",
     },
+    "MCHGC": {
+        "name": "MCHGC",
+        "description": "Set battery maximum charge current",
+        "help": " -- examples: MCHGC1200 (Current in mA xxxx)",
+        "type": "SETTER",
+        "response": [
+            ["ack", "Command execution", {"NAK": "Failed", "ACK": "Successful"}],
+        ],
+        "test_responses": [
+            b"^1\x0b\xc2\r",
+            b"^0\x1b\xe3\r",
+        ],
+        "regex": "MCHGC([012]\\d\\d\\d)$",
+    },
     "MUCHGC": {
         "name": "MUCHGC",
-        "description": "Set battery charge current",
+        "description": "Set maximum charge current from AC",
         "help": " -- examples: MUCHGC0600 (Current in mA xxxx)",
         "type": "SETTER",
         "response": [
@@ -854,7 +843,7 @@ COMMANDS = {
     "BDCM": {
         "name": "BDCM",
         "description": "Battery discharge max current in hybrid mode",
-        "help": " -- examples: (BDCMxxxx, 0.1A)",
+        "help": " -- examples: (BDCMxxxx, A)",
         "type": "SETTER",
         "response": [
             ["ack", "Command execution", {"NAK": "Failed", "ACK": "Successful"}],
@@ -863,7 +852,21 @@ COMMANDS = {
             b"^1\x0b\xc2\r",
             b"^0\x1b\xe3\r",
         ],
-        "regex": "BDCM(0[1-2]\\d\\d)$",
+        "regex": "BDCM(0[012]\\d\\d)$",
+    },
+    "BATDV": {
+        "name": "BATDV",
+        "description": "Battery discharge voltage limits",
+        "help": " -- examples: (BATDV0420,0440,0430,0450, 0.1V)",
+        "type": "SETTER",
+        "response": [
+            ["ack", "Command execution", {"NAK": "Failed", "ACK": "Successful"}],
+        ],
+        "test_responses": [
+            b"^1\x0b\xc2\r",
+            b"^0\x1b\xe3\r",
+        ],
+        "regex": "BATDV(0[45]\\d\\d,0[45]\\d\\d,0[45]\\d\\d,0[45]\\d\\d)$",
     },
 }
 
@@ -875,28 +878,16 @@ class pi17(AbstractProtocol):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__()
         self._protocol_id = b"PI17"
-        self.COMMANDS = COMMANDS
+        self.COMMANDS = QUERY_COMMANDS
+        self.COMMANDS.update(SETTER_COMMANDS)
+        # TODO fix these lists
         self.STATUS_COMMANDS = []
         self.SETTINGS_COMMANDS = [
-            "PI",
-            "ID",
-            "VFW",
-            "VFW2",
             "MD",
-            "PIRI",
-            "GS",
-            "PS",
-            "MOD",
-            "WS",
-            "FLAG",
-            "T",
-            "ET",
-            "EY",
-            "ED",
-            "EH",
-            "HECS",
         ]
         self.DEFAULT_COMMAND = "PI"
+        self.PID = "PI"
+        self.ID_COMMANDS = ["PI", "DM"]
 
     def get_full_command(self, command) -> bytes:
         """
@@ -916,19 +907,6 @@ class pi17(AbstractProtocol):
         data_length = len(_cmd) + 1
         if _type == "QUERY":
             _prefix = f"^P{data_length:03}"
-            _pre_cmd = bytes(_prefix, "utf-8") + _cmd
-            log.debug(f"_pre_cmd: {_pre_cmd}")
-            log.debug(f"_prefix: {_prefix}")
-            # calculate the CRC
-            # crc_high; crc_low = crc(_pre_cmd)
-            # combine byte_cmd, CRC , return
-            # PI18 full command "^P005GS\x..\x..\r"
-            # _crc = bytes([crc_high, crc_low, 13])
-            full_command = _pre_cmd + bytes([13])  # + _crc
-            log.debug(f"full command: {full_command}")
-            return full_command
-        elif _type == "QUERYD":
-            _prefix = self._command_defn["prefix"]
             _pre_cmd = bytes(_prefix, "utf-8") + _cmd
             log.debug(f"_pre_cmd: {_pre_cmd}")
             log.debug(f"_prefix: {_prefix}")

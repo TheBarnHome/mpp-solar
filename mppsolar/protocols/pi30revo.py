@@ -1,12 +1,47 @@
+""" mppsolar / protocols / pi30revo.py """
 import logging
 
 from .abstractprotocol import AbstractProtocol
 from .protocol_helpers import crcPI as crc
-from .protocol_helpers import crc8P1 as chk
+from .protocol_helpers import crc8 as chk
 
 log = logging.getLogger("pi30revo")
 
 COMMANDS = {
+    "PSET": {
+        # 'PSET011103 56.0 56.7 47.0 47.0 030 000 2024 02 20 07 22 00'
+        #      000100 56.0 54.0 44.0 42.0 030 010 2018 06 01 20 00 00 00
+        "name": "PSET",
+        "description": "Set current machine configuration information",
+        "help": " -- sets various metrics from the Inverter",
+        "type": "SETTER",
+        "crctype": "chk",
+        "response": [
+            ["ack", "Command execution", {"NAK": "Failed", "ACK": "Successful"}],
+        ],
+        "test_responses": [
+            b"(NAK\x03\r",
+            b"(ACK\x39\x20\r",
+        ],
+        "regex": "PSET(\d+ \d+[.]\d+ \d+[.]\d+ \d+[.]\d+ \d+[.]\d+ \d+ \d+ \d+ \d+ \d+ \d+ \d+.*)$",  # pylint: disable=W1401 # noqa: W605
+    },
+    "_PSET": {
+        # 'PSET011103 56.0 56.7 47.0 47.0 030 000 2024 02 20 07 22 00'
+        #      000100 56.0 54.0 44.0 42.0 030 010 2018 06 01 20 00 00 00
+        "name": "PSET",
+        "description": "Set current machine configuration information",
+        "help": " -- sets various metrics from the Inverter",
+        "type": "SETTER",
+        "crctype": "chk",
+        "response": [
+            ["ack", "Command execution", {"NAK": "Failed", "ACK": "Successful"}],
+        ],
+        "test_responses": [
+            b"(NAK\x03\r",
+            b"(ACK\x39\x20\r",
+        ],
+        "regex": "_PSET(\d+ \d+[.]\d+ \d+[.]\d+ \d+[.]\d+ \d+[.]\d+ \d+ \d+ \d+ \d+ \d+ \d+ \d+.*)$",  # pylint: disable=W1401 # noqa: W605
+    },
     "PQSE": {
         "name": "PQSE",
         "description": "Read current machine configuration information",
@@ -153,7 +188,7 @@ COMMANDS = {
             ],
         ],
         "test_responses": [
-            b"(000 00.0 000 00.0 0000 000 00.0 000 000 000 000 00.0 0000 000000 000000 S 00 00\x04\n",
+            b"(000 00.0 000 00.0 0000 000 00.0 000 000 000 000 00.0 0000 000000 000000 S 00 00\x03\n",
         ],
     },
     "QMOD": {
@@ -324,10 +359,60 @@ COMMANDS = {
             b"(230.0 21.7 230.0 50.0 21.7 5000 4000 48.0 46.0 42.0 56.4 54.0 0 10 010 1 0 0 6 01 0 0 54.0 0 1\x6F\x7E\r",
         ],
     },
+    "QLITH0": {
+        "name": "QLITH0",
+        "description": "Read lithium battery information",
+        "help": " -- queries the value of various metrics from the battery",
+        "type": "QUERY",
+        "crctype": "crc",
+        "response": [
+            ["float", "Battery voltage from BMS", "V"],
+            ["float", "Battery charging current from BMS", "A"],
+            ["float", "Battery discharge current from BMS", "A"],
+            ["int", "Battery temperature", "0.1°C"],
+            ["int", "Battery capacity from BMS", "%"],
+            ["int", "Battery wearout", "%"],
+            ["float", "Battery max charging current", "A"],
+            ["float", "Battery max discharge current", "A"],
+            ["float", "Battery max charge voltage", "V"],
+            ["float", "Battery min discharge voltage", "V"],
+            [
+                "keyed",
+                "Fault Code from BMS",
+                {
+                    "0": "No warning",
+                    "1": "Battery overvoltage",
+                    "2": "Low battery",
+                    "3": "Battery over temperature",
+                    "4": "Battery low temperature",
+                    "5": "Battery overcurrent",
+                    "6": "Battery output short circut",
+                },
+            ],
+            [
+                "keyed",
+                "Warning Code fom BMS",
+                {
+                    "0": "No warning",
+                    "1": "Battery overvoltage",
+                    "2": "Low battery",
+                    "3": "Battery over temperature",
+                    "4": "Battery low temperature",
+                    "5": "Battery overcurrent",
+                    "6": "Battery output short circut",
+                },
+            ],
+        ],
+        "test_responses": [
+            b"(048.8 000.0 000.9 250 024 000 052.5 010.0 053.5 004.4 0 2\xFC\x0B\n",
+            b'(052.5 000.0 000.0 032 036 000 070.0 007.0 057.0 004.6 0 5\x82\xe0\r',
+        ],
+    },
 }
 
 
 class pi30revo(AbstractProtocol):
+    "PI30 protocol handler for REVO and similar inverters"
     def __str__(self):
         return "PI30 protocol handler for REVO and similar inverters"
 
@@ -339,8 +424,9 @@ class pi30revo(AbstractProtocol):
         self.SETTINGS_COMMANDS = ["QPIRI"]
         self.DEFAULT_COMMAND = "QPI"
         # log.info(f'Using protocol {self._protocol_id} with {len(self.COMMANDS)} commands')
+        self._command_defn = None
 
-    def is_CRC_valid(self, response):
+    def is_crc_valid(self, response):
         """
         Test response using CRC approach
         """
@@ -350,11 +436,14 @@ class pi30revo(AbstractProtocol):
             return True
         return False
 
-    def is_CHK_valid(self, response):
+    def is_chk_valid(self, response):
         """
         Test response using CHK approach
         """
-        checksum = chk(response[:-2])
+        if isinstance(response, str):
+            response = response.encode()
+        checksum = self.get_chk(response[:-2])
+        log.debug("response chk: %s", hex(checksum))
         if response[-2:-1] == bytes([checksum]):
             log.debug("Checksums match")
             return True
@@ -366,12 +455,22 @@ class pi30revo(AbstractProtocol):
           each with different lengths
         """
         # This protocol responses can either have a CRC or a Checksum..
+        # first check if CRC is valid
+        if self.is_crc_valid(response):
+            if isinstance(response, str):
+                return response[1:-3].split(" ")
+            return response[1:-3].split(b" ")
         # If there is a valid checksum, assume it is using the checksum approach
-        if self.is_CHK_valid(response):
-            return response[1:-2].split(b" ")
+        if self.is_chk_valid(response):
+            if response.startswith(b"("):
+                # Trim leading '(' + trailing CHK and \r of response, then split
+                return response[1:-2].split(b" ")
+            else:
+                # Trim trailing CHK and \r of response, then split
+                return response[:-2].split(b" ")
         # Just use the default approach then
         # Trim leading '(' + trailing CRC and \r of response, then split
-        if type(response) is str:
+        if isinstance(response, str):
             return response[1:-3].split(" ")
         return response[1:-3].split(b" ")
 
@@ -382,42 +481,43 @@ class pi30revo(AbstractProtocol):
             return False, {"validity check": ["Error: Response to short", ""]}
 
         # This protocol responses can either have a CRC or a Checksum...
-        if b"(NAK" in response:
-            return False, {"validity check": ["Error: NAK", ""]}
+        # if b"(NAK" in response:
+        #     return False, {"validity check": ["Error: NAK", ""]}
 
-        if self.is_CHK_valid(response) or self.is_CRC_valid(response):
+        if self.is_chk_valid(response) or self.is_crc_valid(response):
             return True, {}
         else:
             return False, {"validity check": ["Error: Invalid response CRCs", ""]}
+
+    def get_chk(self, byte_cmd):
+        """ generate the CHK bytes """
+        checksum = chk(byte_cmd) + 1
+        log.debug("checksum+1: %s", hex(checksum))
+        return checksum
 
     def get_full_command(self, command) -> bytes:
         """
         Override the default get_full_command as its different for PI30REVO
         """
-        log.info(
-            f"sing protocol {self._protocol_id} with {len(self.COMMANDS)} commands"
-        )
+        log.info("Using protocol: %s with %s commands", self._protocol_id, len(self.COMMANDS))
         # These need to be set to allow other functions to work`
         self._command = command
-        self._command_defn = self.get_command_defn(command)
         # End of required variables setting
-
         byte_cmd = bytes(command, "utf-8")
-        if (
-            self._command_defn
-            and "crctype" in self._command_defn
-            and self._command_defn["crctype"] == "chk"
-        ):
-            log.debug(f"Using CHK checksum approach for command {self._command}")
-            checksum = chk(byte_cmd)
-            log.debug(f"checksum {checksum}")
+        if command.startswith('PSET'):
+            log.debug("Using CHK checksum approach for PSET command")
+            checksum = self.get_chk(byte_cmd)
+            full_command = byte_cmd + bytes([checksum])
+        elif self._command_defn and self._command_defn.get("crctype") == "chk":
+            log.debug("Using CHK checksum approach for command: %s", self._command)
+            checksum = self.get_chk(byte_cmd)
             full_command = byte_cmd + bytes([checksum]) + bytes([13])
         else:
-            log.debug(f"Using PI30 CRC checksum approach for command {self._command}")
+            log.debug("Using PI30 CRC checksum approach for command: %s", self._command)
             # calculate the CRC
             crc_high, crc_low = crc(byte_cmd)
             # combine byte_cmd, CRC , return
             full_command = byte_cmd + bytes([crc_high, crc_low, 13])
 
-        log.debug(f"full command: {full_command}")
+        log.debug("full command: %s", full_command)
         return full_command

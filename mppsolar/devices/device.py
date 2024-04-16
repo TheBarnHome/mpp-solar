@@ -2,9 +2,10 @@
 import logging
 from abc import ABC
 
+from mppsolar.version import __version__  # noqa: F401
 from mppsolar.helpers import get_kwargs
 from mppsolar.inout import get_port
-from mppsolar.protocols import get_protocol
+from mppsolar.protocols import get_protocol  # , get_device_id
 
 PORT_TYPE_UNKNOWN = 0
 PORT_TYPE_TEST = 1
@@ -68,7 +69,9 @@ class AbstractDevice(ABC):
         if command == "get_settings":
             return self.get_settings()
         if command == "get_device_id":
-            return self.get_device_id()
+            return self._get_device_id()
+        if command == "get_version":
+            return self.get_version()
 
         if not command:
             command = self._protocol.DEFAULT_COMMAND
@@ -128,16 +131,45 @@ class AbstractDevice(ABC):
             data.update(self.run_command(command))
         return data
 
-    def get_device_id(self) -> dict:
-        _id = ""
-        for command in self._protocol.ID_COMMANDS:
-            result = self.run_command(command)
-            last_key = list(result).pop()
-            value = result[last_key][0]
+    def _get_device_id(self) -> dict:
+        # Try to work out the 'id' for this device
+        # need to know what port/porttype we are connected to
+        # then ...ABC
 
-            if not _id:
-                _id = f"{value}"
-            else:
-                _id = f"{_id}:{value}"
-        log.info(f"DeviceId: {_id}")
-        return {"_command": "Get Device ID", "_command_description": "Generate a device id", "DeviceID": [_id, ""]}
+        # return get_device_id()
+        _id = ""
+        if self._protocol.ID_COMMANDS:
+            # print(self._protocol.ID_COMMANDS)
+            for line in self._protocol.ID_COMMANDS:
+                if isinstance(line, tuple):
+                    command = line[0]
+                else:
+                    command = line
+                result = self.run_command(command)
+                if isinstance(line, tuple):
+                    key = line[1]
+                else:
+                    key = list(result).pop()
+
+                # last_key = list(result).pop()
+                value = result[key][0]
+
+                if not _id:
+                    _id = f"{value}"
+                else:
+                    _id = f"{_id}:{value}"
+            log.info(f"DeviceId: {_id}")
+            return {"_command": "Get Device ID", "_command_description": "Generate a device id", "DeviceID": [_id, ""]}
+        else:
+            return {
+                "_command": "Get Device ID",
+                "_command_description": "Generate a device id",
+                "DeviceID": ["getDeviceId not supported for this protocol", ""],
+            }
+
+    def get_version(self) -> dict:
+        return {
+            "_command": "Get Version",
+            "_command_description": "Output the mpp-solar software version",
+            "MPP-Solar Software Version": [__version__, ""],
+        }

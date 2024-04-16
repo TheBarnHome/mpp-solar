@@ -1,7 +1,7 @@
 import logging
 
-from .abstractprotocol import AbstractProtocol
-from .protocol_helpers import crcPI as crc
+from mppsolar.protocols.abstractprotocol import AbstractProtocol
+from mppsolar.protocols.protocol_helpers import crcPI as crc
 
 log = logging.getLogger("pi30")
 
@@ -299,6 +299,29 @@ SETTER_COMMANDS = {
         ],
         "regex": "PBATMAXDISC([01]\\d\\d)$",
     },
+    "BTA": {
+        "name": "BTA",
+        "description": "Calibrate inverter battery voltage",
+        "help": " -- examples: BTA-01 (reduce inverter reading by 0.05V), BTA+09 (increase inverter reading by 0.45V)",
+        "type": "SETTER",
+        "response": [["ack", "Command execution", {"NAK": "Failed", "ACK": "Successful"}]],
+        "test_responses": [
+            b"(NAK\x73\x73\r",
+            b"(ACK\x39\x20\r",
+        ],
+        "regex": "BTA([-+]0\\d)$",
+    },
+    "PSAVE": {
+        "name": "PSAVE",
+        "description": "Save EEPROM changes",
+        "help": " -- examples: PSAVE (save changes to eeprom)",
+        "type": "SETTER",
+        "response": [["ack", "Command execution", {"NAK": "Failed", "ACK": "Successful"}]],
+        "test_responses": [
+            b"(NAK\x73\x73\r",
+            b"(ACK\x39\x20\r",
+        ],
+    },
 }
 QUERY_COMMANDS = {
     "Q1": {
@@ -490,6 +513,7 @@ QUERY_COMMANDS = {
                     "B": "Battery",
                     "F": "Fault",
                     "H": "Power saving",
+                    "Y": "Bypass",
                 },
             ]
         ],
@@ -689,7 +713,7 @@ QUERY_COMMANDS = {
         "type": "QUERY",
         "response_type": "INDEXED",
         "response": [
-            [0, "AC Input Voltage", "float", "V", {"icon": "lightning"}],
+            [0, "AC Input Voltage", "float", "V", {"icon": "mdi:lightning"}],
             [1, "AC Input Frequency", "float", "Hz"],
             [2, "AC Output Voltage", "float", "V"],
             [3, "AC Output Frequency", "float", "Hz"],
@@ -760,10 +784,11 @@ QUERY_COMMANDS = {
                     "AGM",
                     "Flooded",
                     "User",
-                    "TBD",
                     "Pylontech",
+                    "Shinheung",
                     "WECO",
                     "Soltaro",
+                    "TBD",
                     "LIb-protocol compatible",
                     "3rd party Lithium",
                 ],
@@ -861,7 +886,7 @@ QUERY_COMMANDS = {
                     "Inverter voltage too high fault",
                     "Over temperature fault",
                     "Fan locked fault",
-                    "Battery voltage to high fault",
+                    "Battery voltage too high fault",
                     "Battery low alarm warning",
                     "Reserved",
                     "Battery under shutdown warning",
@@ -872,7 +897,7 @@ QUERY_COMMANDS = {
                     "Inverter soft fail fault",
                     "Self test fail fault",
                     "OP DC voltage over fault",
-                    "Bat open fault",
+                    "Battery open fault",
                     "Current sensor fail fault",
                     "Battery short fault",
                     "Power limit warning",
@@ -909,6 +934,56 @@ QUERY_COMMANDS = {
             b"",
         ],
     },
+    "QBMS": {
+        "name": "QBMS",
+        "description": "Read lithium battery information",
+        "help": " -- queries the value of various metrics from the battery",
+        "type": "QUERY",
+        "crctype": "chk",
+        "response": [
+
+            [
+                "keyed",
+                "Battery connect status",
+                {
+                    "0": "Connected",
+                    "1": "Disconnected",
+                },
+            ],
+            ["int", "Battery capacity from BMS", "%"],
+            [
+                "keyed",
+                "Battery force charging",
+                {
+                    "0": "No",
+                    "1": "Yes",
+                },
+            ],
+            [
+                "keyed",
+                "Battery stop discharge flag",
+                {
+                    "0": "Enable discharge",
+                    "1": "Disable discharge",
+                },
+            ],
+            [
+                "keyed",
+                "Battery stop charge flag",
+                {
+                    "0": "Enable charge",
+                    "1": "Disable charge",
+                },
+            ],
+            ["int", "Battery bulk charging voltage from BMS", "0.1 V"],
+            ["int", "Battery float charging voltage from BMS", "0.1 V"],
+            ["int", "Battery cut off voltage from BMS", "0.1 V"],
+            ["float", "Battery max charging current", "A"],
+            ["float", "Battery max discharge current", "A"]],
+         "test_responses": [
+            b"(0 100 0 0 1 532 532 450 0000 0030\x0e\x5E\n",
+        ],
+    },
 }
 
 
@@ -924,6 +999,7 @@ class pi30(AbstractProtocol):
         self.STATUS_COMMANDS = ["QPIGS", "Q1"]
         self.SETTINGS_COMMANDS = ["QPIRI", "QFLAG"]
         self.DEFAULT_COMMAND = "QPI"
+        self.PID = "QPI"
         self.ID_COMMANDS = ["QPI", "QGMN", "QMN"]
         # log.info(f'Using protocol {self._protocol_id} with {len(self.COMMANDS)} commands')
 

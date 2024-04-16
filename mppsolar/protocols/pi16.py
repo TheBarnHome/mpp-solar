@@ -2,14 +2,25 @@ import logging
 
 from .abstractprotocol import AbstractProtocol
 
-# from .pi30 import COMMANDS
-
 log = logging.getLogger("pi16")
 
 # (AAA BBB CCC DDD EEE
 # (000 001 002 003 004
 
 COMMANDS = {
+    "QEH": {
+        "name": "QEH",
+        "description": "Query energy produced for a specific hour",
+        "help": " -- Query device for energy produced in the specific day at date in YYYYMMDDHH format",
+        "type": "QUERY",
+        "checksum_required": "True",
+        "response_type": "SEQUENTIAL",
+        "response": [
+            ["int", "Energy produced", "Wh"],
+        ],
+        "test_responses": [],
+        "regex": "QED(\\d\\d\\d\\d\\d\\d\\d\\d\\d\\d)$",
+    },
     "QED": {
         "name": "QED",
         "description": "Query energy produced for a specific day",
@@ -24,6 +35,52 @@ COMMANDS = {
             b"(012345\x9c\xaf\r",
         ],
         "regex": "QED(\\d\\d\\d\\d\\d\\d\\d\\d)$",
+    },
+    "QEM": {
+        "name": "QEM",
+        "description": "Query energy produced for a specific month",
+        "help": " -- Query device for energy produced in the specific month at date in YYYYMM format",
+        "type": "QUERY",
+        "checksum_required": "True",
+        "response_type": "SEQUENTIAL",
+        "response": [
+            ["int", "Energy produced", "Wh"],
+        ],
+        "test_responses": [],
+        "regex": "QED(\\d\\d\\d\\d\\d\\d)$",
+    },
+    "QEY": {
+        "name": "QEY",
+        "description": "Query energy produced for a specific year",
+        "help": " -- Query device for energy produced in the specific month at date in YYYY format",
+        "type": "QUERY",
+        "checksum_required": "True",
+        "response_type": "SEQUENTIAL",
+        "response": [
+            ["int", "Energy produced", "Wh"],
+        ],
+        "test_responses": [],
+        "regex": "QED(\\d\\d\\d\\d)$",
+    },
+    "QID": {
+        "name": "QID",
+        "description": "Device Serial Number inquiry",
+        "help": " -- queries the device serial number",
+        "type": "QUERY",
+        "response": [["string", "Serial Number", ""]],
+        "test_responses": [
+            b"(96131801100057\x93\xa5\r",
+        ],
+    },
+    "QGMN": {
+        "name": "QGMN",
+        "description": "General Model Name Inquiry",
+        "type": "QUERY",
+        "response_type": "SEQUENTIAL",
+        "response": [["bytes.decode", "General Model Name", ""]],
+        "test_responses": [
+            b"(000D\xee\r",
+        ],
     },
     "QMOD": {
         "name": "QMOD",
@@ -142,6 +199,28 @@ COMMANDS = {
             b"(230.0 50.0 013.0 230.0 013.0 18.0 048.0 1 10 0\x86\x42\r",
         ],
     },
+    "QVFW": {
+        "name": "QVFW",
+        "description": "Main CPU firmware version inquiry",
+        "help": " -- queries the main CPU firmware version",
+        "type": "QUERY",
+        "response_type": "SEQUENTIAL",
+        "response": [["bytes.decode:r[6:]", "Main CPU firmware version", ""]],
+        "test_responses": [
+            b"(VERFW:00000.27V\t\r",
+        ],
+    },
+    "QVFW2": {
+        "name": "QVFW2",
+        "description": "Secondary CPU firmware version inquiry",
+        "help": " -- queries the secondary CPU firmware version",
+        "type": "QUERY",
+        "response_type": "SEQUENTIAL",
+        "response": [["bytes.decode:r[7:]", "Secondary CPU firmware version", ""]],
+        "test_responses": [
+            b"(VERFW2:00000.30\xe3\x88\r",
+        ],
+    },
 }
 
 
@@ -160,6 +239,12 @@ class pi16(AbstractProtocol):
             "QPI",
         ]
         self.DEFAULT_COMMAND = "QPI"
+        self.PID = "QPI"
+        self.ID_COMMANDS = [
+            ("QPI", "Protocol Version"),
+            ("QGMN", "General Model Name"),
+            ("QVFW", "Main CPU firmware version"),
+        ]
 
     def checksum(self, data):
         # QED20150620106

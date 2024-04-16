@@ -2,7 +2,9 @@ import abc
 import calendar  # noqa: F401
 import logging
 import re
+from datetime import datetime  # noqa: F401
 from typing import Tuple
+from pydantic import BaseModel
 
 from ..helpers import get_resp_defn, get_value
 from .protocol_helpers import BigHex2Short, BigHex2Float  # noqa: F401
@@ -15,6 +17,11 @@ from .protocol_helpers import crcPI as crc
 log = logging.getLogger("AbstractProtocol")
 
 
+class ProtocolDTO(BaseModel):
+    protocol_id: str
+    commands: dict
+
+
 class AbstractProtocol(metaclass=abc.ABCMeta):
     def __init__(self, *args, **kwargs) -> None:
         self._command = None
@@ -23,9 +30,15 @@ class AbstractProtocol(metaclass=abc.ABCMeta):
         self.STATUS_COMMANDS = None
         self.SETTINGS_COMMANDS = None
         self.DEFAULT_COMMAND = None
+        self.PID = None
+        self.ID_COMMANDS = None
         self._protocol_id = None
 
-    def list_commands(self):
+    def toDTO(self) -> ProtocolDTO:
+        dto = ProtocolDTO(protocol_id=self._protocol_id, commands=self.list_commands())
+        return dto
+
+    def list_commands(self) -> dict:
         # print(f"{'Parameter':<30}\t{'Value':<15} Unit")
         if self._protocol_id is None:
             log.error("Attempted to list commands with no protocol defined")
@@ -162,10 +175,7 @@ class AbstractProtocol(metaclass=abc.ABCMeta):
             key = ""
             for x in raw_value:
                 key += f"{x:02x}"
-            if key in data_units:
-                r = data_units[key]
-            else:
-                r = f"Invalid key: {key}"
+            r = data_units.get(key, f"Invalid key: {key}")
             return [(data_name, r, "", None)]
         if data_type == "str_keyed":
             log.debug("str_keyed defn")
@@ -185,10 +195,7 @@ class AbstractProtocol(metaclass=abc.ABCMeta):
             #     },
             # ]
             key = raw_value.decode()
-            if key in data_units:
-                r = data_units[key]
-            else:
-                r = f"Invalid key: {key}"
+            r = data_units.get(key, f"Invalid key: {key}")
             return [(data_name, r, "", extra_info)]
         format_string = f"{data_type}(raw_value)"
         log.debug(f"Processing format string {format_string}")
@@ -208,6 +215,18 @@ class AbstractProtocol(metaclass=abc.ABCMeta):
             f = frame_number  # noqa: F841
             data_name = eval(data_name)
         return [(data_name, r, data_units, extra_info)]
+
+    def decode_result(self, result, command):
+        log.info("decode_result: raw: %s, command: %s" % (result.raw_response, command.name))
+
+        # TODO: sort this so it isnt so carp
+        data = self.decode(result.raw_response, command.name)
+        # Clean data
+        data.pop("raw_response", None)
+        data.pop("_command", None)
+        data.pop("_command_description", None)
+        result.decoded_response = data
+        return result
 
     def decode(self, response, command) -> dict:
         """
@@ -273,6 +292,8 @@ class AbstractProtocol(metaclass=abc.ABCMeta):
             # print("Processing DEFAULT type responses")
             for i, result in enumerate(responses):
                 # decode result
+                if result == b'':
+                    continue
                 if type(result) is bytes:
                     result = result.decode("utf-8")
 
@@ -284,7 +305,7 @@ class AbstractProtocol(metaclass=abc.ABCMeta):
 
                 # key = "{}".format(resp_format[1]).lower().replace(" ", "_")
                 key = resp_format[1]
-                # log.debug(f'result {result}, key {key}, resp_format {resp_format}')
+                log.debug(f'result {result}, key {key}, resp_format {resp_format}')
                 # Process results
                 if result == "NAK":
                     msgs[f"WARNING{i}"] = [
@@ -388,7 +409,6 @@ class AbstractProtocol(metaclass=abc.ABCMeta):
             frame_count = 1
 
         for frame_number, frame in enumerate(frames):
-
             for i, response in enumerate(frame):
                 extra_info = None
                 if response_type == "KEYED":
@@ -403,7 +423,7 @@ class AbstractProtocol(metaclass=abc.ABCMeta):
                     response_defn = get_resp_defn(lookup_key, command_defn["response"])
                     if response_defn is None:
                         # No definition for this key, so ignore???
-                        log.warn(f"No definition for {response}")
+                        log.warning(f"No definition for {response}")
                         continue
                     # key = response_defn[0] #0
                     data_type = response_defn[3]  # 1
@@ -482,7 +502,7 @@ class AbstractProtocol(metaclass=abc.ABCMeta):
                         response_defn = command_defn["response"][i]
                     if response_defn is None:
                         # No definition for this key, so ignore???
-                        log.warn(f"No definition for {response}")
+                        log.warning(f"No definition for {response}")
                         response_defn = [
                             "str",
                             1,
@@ -498,9 +518,7 @@ class AbstractProtocol(metaclass=abc.ABCMeta):
                 # Check for lookup
                 if data_type.startswith("lookup"):
                     log.debug("processing lookup...")
-                    log.info(
-                        f"Processing data_type: '{data_type}' for data_name: '{data_name}', raw_value '{raw_value}'"
-                    )
+                    log.info(f"Processing data_type: '{data_type}' for data_name: '{data_name}', raw_value '{raw_value}'")
                     m = msgs
                     template = data_type.split(":", 1)[1]
                     log.debug(f"Got template {template} for {data_name} {raw_value}")

@@ -6,9 +6,7 @@ log = logging.getLogger("helpers")
 
 
 def get_kwargs(kwargs, key, default=None):
-    if key not in kwargs or not kwargs[key]:
-        return default
-    return kwargs[key]
+    return kwargs.get(key) or default
 
 
 def key_wanted(key, filter=None, excl_filter=None):
@@ -81,17 +79,23 @@ def get_device_class(device_type=None):
     return device_class
 
 
-def getMaxLen(d):
+def getMaxLen(data, index=0):
     _maxLen = 0
-    for i in d:
-        if type(i) == list:
-            i = i[0]
-        if len(i) > _maxLen:
-            _maxLen = len(i)
+    for item in data:
+        if type(item) == list:
+            item = item[index]
+        if type(item) == float or type(item) == int:
+            item = str(item)
+        if len(item) > _maxLen:
+            _maxLen = len(item)
     return _maxLen
 
+def get_max_response_length(data, index=0):
+    return getMaxLen(data, index)
 
 def pad(text, length):
+    if type(text) == float or type(text) == int:
+        text = str(text)
     if len(text) > length:
         return text
     return text.ljust(length, " ")

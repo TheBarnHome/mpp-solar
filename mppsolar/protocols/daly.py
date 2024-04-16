@@ -4,8 +4,6 @@ from typing import Tuple
 from .abstractprotocol import AbstractProtocol
 from .protocol_helpers import crc8 as dalyChecksum
 
-# from .pi30 import COMMANDS
-
 log = logging.getLogger("daly")
 
 # (AAA BBB CCC DDD EEE
@@ -235,12 +233,10 @@ class daly(AbstractProtocol):
 
     def is_multiframe(self, response) -> bool:
         # startFlag = bytes.fromhex("A5")
-        if (
-            "response_length" in self._command_defn
-            and len(response) > self._command_defn["response_length"]
-        ):
-            return True
-        return False
+        return (
+            (response_length := self._command_defn.get("response_length"))
+            and len(response) > response_length
+        )
 
     def check_response_valid(self, response) -> Tuple[bool, dict]:
         """

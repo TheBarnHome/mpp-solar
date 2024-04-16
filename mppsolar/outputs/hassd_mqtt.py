@@ -1,6 +1,7 @@
 import json as js
 import logging
 import re
+from datetime import datetime
 from time import sleep
 
 from ..helpers import get_kwargs, key_wanted
@@ -18,15 +19,11 @@ class hassd_mqtt(mqtt):
 
     def build_msgs(self, *args, **kwargs):
         log.debug(f"kwargs {kwargs}")
-
         data = get_kwargs(kwargs, "data")
         # Clean data
-        if "_command" in data:
-            command = data.pop("_command")
-        if "_command_description" in data:
-            data.pop("_command_description")
-        if "raw_response" in data:
-            data.pop("raw_response")
+        command = data.pop("_command", None)
+        data.pop("_command_description", None)
+        data.pop("raw_response", None)
 
         # check if config supplied
         config = get_kwargs(kwargs, "config")
@@ -75,16 +72,19 @@ class hassd_mqtt(mqtt):
         value_msgs = []
 
         # Loop through responses
-        for key in data:
+        for key, values in data.items():
             orig_key = key
-            value = data[key][0]
-            unit = data[key][1]
+            value = values[0]
+            unit = values[1]
             icon = None
-            if len(data[key]) > 2 and data[key][2] and "icon" in data[key][2]:
-                icon = data[key][2]["icon"]
+            if len(values) > 2 and values[2] and "icon" in values[2]:
+                icon = values[2]["icon"]
             device_class = None
-            if len(data[key]) > 2 and data[key][2] and "device-class" in data[key][2]:
-                device_class = data[key][2]["device-class"]
+            if len(values) > 2 and values[2] and "device-class" in values[2]:
+                device_class = values[2]["device-class"]
+            state_class = None
+            if len(values) > 2 and values[2] and "state_class" in values[2]:
+                state_class = values[2]["state_class"]
 
             # remove spaces
             if remove_spaces:
@@ -131,10 +131,22 @@ class hassd_mqtt(mqtt):
                 }
                 if device_class:
                     payload["device_class"] = device_class
-                if unit == "W":
-                    payload.update({"state_class": "measurement", "device_class": "power"})
+                if state_class:
+                    payload["state_class"] = state_class
                 if icon:
                     payload.update({"icon": icon})
+                if unit == "W":
+                    payload.update({"state_class": "measurement", "device_class": "power"})
+                if unit == "Wh" or unit == "kWh":
+                    payload.update(
+                        {
+                            "icon": "mdi:counter",
+                            "device_class": "energy",
+                            "state_class": "total",
+                            "last_reset": str(datetime.now()),
+                        }
+                    )
+
                 # msg = {"topic": topic, "payload": payload, "retain": True}
                 payloads = js.dumps(payload)
                 # print(payloads)
@@ -143,7 +155,6 @@ class hassd_mqtt(mqtt):
                 #
                 # VALUE SETTING
                 #
-                # unit = data[key][1]
                 # 'tag'/status/total_output_active_power/value 1250
                 # 'tag'/status/total_output_active_power/unit W
                 topic = f"homeassistant/{sensor}/mpp_{tag}_{key}/state"

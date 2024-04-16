@@ -3,8 +3,6 @@ from time import sleep
 
 import paho.mqtt.client as mqtt_client
 
-from ..helpers import get_kwargs
-
 # Set-up logger
 log = logging.getLogger("mqttbroker")
 
@@ -16,7 +14,7 @@ class MqttBroker:
         else:
             return "MqttBroker DISABLED"
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, config=None):
 
         # mqttbroker:
         #     name: localhost
@@ -25,13 +23,18 @@ class MqttBroker:
         #     pass: null
         #     adhoc_commands:
         #     topic: test/command_topic
-
-        config = get_kwargs(kwargs, "config")
+        self.config = config
         if config is None:
             config = {}
         log.debug(f"mqttbroker config: {config}")
         self.name = config.get("name")
-        self.port = config.get("port", 1883)
+        try:
+            _port = config.get("port", 1883)
+            self.port = int(_port)
+        except ValueError:
+            log.info(f"Unable to process port: '{_port}', defaulting to 1883")
+            self.port = 1883
+
         self.username = config.get("user")
         self.password = config.get("pass")
         self._isConnected = False
@@ -95,7 +98,7 @@ class MqttBroker:
             self.mqttc.loop_start()
             sleep(1)
         except ConnectionRefusedError as exc:
-            log.warn(f"{self.name} refused connection '{exc}'")
+            log.warning(f"{self.name} refused connection '{exc}'")
 
     def start(self):
         if self._isConnected:
@@ -133,7 +136,7 @@ class MqttBroker:
             log.debug(f"Subscribing to topic {topic}")
             self.mqttc.subscribe(topic, qos=0)
         else:
-            log.warn(f"Did not subscribe to topic {topic} as not connected to broker")
+            log.warning(f"Did not subscribe to topic {topic} as not connected to broker")
 
     def publishMultiple(self, data):
         for msg in data:
@@ -150,7 +153,7 @@ class MqttBroker:
             self.connect()
             sleep(1)
             if not self._isConnected:
-                log.warn("mqtt broker did not connect")
+                log.warning("mqtt broker did not connect")
                 return
         try:
             infot = self.mqttc.publish(topic, payload)
@@ -158,16 +161,6 @@ class MqttBroker:
         except Exception as e:
             log.warning(str(e))
 
-    def setAdhocCommands(self, config={}, callback=None):
-        if not config:
-            return
-
-        adhoc_commands = config.get("adhoc_commands")
-        # sub to command topic if defined
-        adhoc_commands_topic = adhoc_commands.get("topic")
-        if adhoc_commands_topic is not None:
-            log.info(f"Setting adhoc commands topic to {adhoc_commands_topic}")
-            self.subscribe(adhoc_commands_topic, callback)
 
 
 # print("Connecting to "+args.host+" port: "+str(port))

@@ -2,7 +2,6 @@
 import logging
 import math
 
-# from binascii import unhexlify
 from struct import unpack
 
 log = logging.getLogger("protocol_helpers")
@@ -44,13 +43,9 @@ def crcJK232(byteData):
     CRC = 0
     for b in byteData:
         CRC += b
-    CRC = CRC ^ 0xFFFF
-    CRC += 1
-
     crc_low = CRC & 0xFF
     crc_high = (CRC >> 8) & 0xFF
-    return [crc_high, crc_low]
-
+    return [crc_high, crc_low]    
 
 def vedHexChecksum(byteData):
     """
@@ -352,9 +347,9 @@ def crcPI(data_bytes):
     crc_low = crc & 0xFF
     crc_high = (crc >> 8) & 0xFF
 
-    if crc_low == 0x28 or crc_low == 0x0D or crc_low == 0x0A:
+    if crc_low == 0x28 or crc_low == 0x0D or crc_low == 0x0A or crc_low == 0x00:
         crc_low += 1
-    if crc_high == 0x28 or crc_high == 0x0D or crc_high == 0x0A:
+    if crc_high == 0x28 or crc_high == 0x0D or crc_high == 0x0A or crc_high == 0x00:
         crc_high += 1
 
     crc = crc_high << 8
@@ -362,3 +357,34 @@ def crcPI(data_bytes):
 
     log.debug(f"Generated CRC {crc_high:#04x} {crc_low:#04x} {crc:#06x}")
     return [crc_high, crc_low]
+
+
+def get_value(_list, _index):
+    """
+    get the value from _list or return None if _index is out of bounds
+    """
+    # print(_list, len(_list))
+    if _index >= len(_list):
+        return None
+    return _list[_index]
+
+
+def get_resp_defn(key, defns):
+    """
+    look for a definition for the supplied key
+    """
+    # print(key, defns)
+    if not key:
+        return None
+    if type(key) is bytes:
+        try:
+            key = key.decode("utf-8")
+        except UnicodeDecodeError:
+            log.info(f"key decode error for {key}")
+    for defn in defns:
+        if key == defn[0]:
+            # print(key, defn)
+            return defn
+    # did not find definition for this key
+    log.info(f"No defn found for {key} key")
+    return [key, key, "", ""]

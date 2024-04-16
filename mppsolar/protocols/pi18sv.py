@@ -113,7 +113,7 @@ COMMANDS = {
             ["int", "Slave 2 CPU version", ""],
         ],
         "test_responses": [
-            b"^D02005402,08025,00000)\xc3\x9d\r",
+            b"^D02005402,08025,00000\xc3\x9d\r",
         ],
     },
     "MCHGCR": {  # On my SV IV, this commands returns 12 values, from 10 to 120 amps
