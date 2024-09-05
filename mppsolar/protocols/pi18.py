@@ -278,20 +278,35 @@ COMMANDS = {
             b"",
         ],
     },
-    #    "FWS": {
-    #        "name": "FWS",
-    #        "prefix": "^P005",
-    #        "description": "fault and warning status",
-    #        "help": " -- Query fault and warning status",
-    #        "type": "QUERY",
-    #        "response": [
-    #            [
-    #            ]
-    #        ],
-    #        "test_responses": [
-    #            b"",
-    #        ],
-    #    },
+    "FWS": {
+        "name": "FWS",
+        "prefix": "^P005",
+        "description": "Query fault and warning status",
+        "help": " -- queries the fault and warning status",
+        "type": "QUERY",
+        "response": [
+            ["int", "Fault code", ""],
+            ["int", "Line fail", ""],
+            ["int", "Output circuit short", ""],
+            ["int", "Inverter over temperature", ""],
+            ["int", "Fan lock", ""],
+            ["int", "Battery voltage high", ""],
+            ["int", "Battery low", ""],
+            ["int", "Battery under", ""],
+            ["int", "Over load", ""],
+            ["int", "EEProm fail", ""],
+            ["int", "Power limit", ""],
+            ["int", "PV1 voltage high", ""],
+            ["int", "PV2 voltage high", ""],
+            ["int", "MPPT1 overload warning", ""],
+            ["int", "MPPT2 overload warning", ""],
+            ["int", "Battery too low to charge for SCC1", ""],
+            ["int", "Battery too low to charge for SCC2", ""],
+        ],
+        "test_responses": [
+            b"^D03900,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\xc2\xb6\x9e\r",
+        ],
+    },
     "FLAG": {
         "name": "FLAG",
         "prefix": "^P007",
