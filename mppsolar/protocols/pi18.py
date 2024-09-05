@@ -574,7 +574,7 @@ class pi18(AbstractProtocol):
             "PIRI",
             "GS",
             "MOD",
-            # "FWS",
+            "FWS",
             "FLAG",
             # "DI",
             "MCHGCR",
